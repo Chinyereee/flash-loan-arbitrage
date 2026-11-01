@@ -270,3 +270,16 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .quote-status:has(+ .result-label) { padding-bottom: 8px; border-bottom: 1px solid #273240; }
 .quote-error { color: #ff9b9b; }
 
+
+.route-column { display: flex; min-width: 0; flex-direction: column; align-items: stretch; gap: 8px; }
+.route-warning { display: flex; align-items: flex-start; gap: 9px; padding: 10px 12px; border: 1px solid #655329; border-radius: 9px; color: #d8c28a; background: #211d13; font-size: 10px; line-height: 1.45; }
+.warning-mark { width: 16px; height: 16px; flex: 0 0 16px; display: grid; place-items: center; border: 1px solid #aa8b42; border-radius: 50%; color: #e1c578; font: 700 10px var(--mono); }
+.route-warning-error { border-color: #633b42; color: #f1a3a6; background: #25171b; }
+.route-warning-error .warning-mark { border-color: #a4525c; color: #ffb0b2; }
+@media (max-width: 1050px) {
+  .route-column:last-child { grid-column: 1 / -1; }
+}
+@media (max-width: 850px) {
+  .route-column:last-child { grid-column: auto; }
+}
+

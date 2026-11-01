@@ -31,7 +31,7 @@ const routes: Route[] = [
     family: "EVM",
     tokens: ["USDT", "WETH", "USDC", "USDT"],
     providers: [
-      { id: "uniswap", name: "Uniswap V3", mark: "UNI", description: "Three-hop Ethereum route · on-chain quote", fee: "0.05% · 0.05% · 0.01%", gas: "Awaiting quote" },
+      { id: "uniswap", name: "Uniswap V3", mark: "UNI", description: "Three-hop route · live quote when connected", output: "10,042.18", fee: "0.05% · 0.05% · 0.01%", gas: "165k units" },
       { id: "sushi", name: "SushiSwap", mark: "S", description: "Constant-product pool · demo quote", output: "10,033.64", fee: "0.30%", gas: "157k units" },
       { id: "balancer", name: "Balancer", mark: "B", description: "Weighted pool · demo quote", output: "10,026.30", fee: "0.10%", gas: "157k units" },
     ],
@@ -198,9 +198,8 @@ function App() {
             <h1>Choose an execution provider</h1>
             <p className="heading-copy">Compare provider quotes across three fixed network routes.</p>
           </div>
-          <span className="demo-banner">UNISWAP V3 ON-CHAIN · OTHER PROVIDERS DEMO</span>
+          <span className="demo-banner">UNISWAP V3 LIVE WHEN CONNECTED · OTHERS DEMO</span>
         </section>
-        {walletError && <p className="wallet-error" role="alert">{walletError}</p>}
 
         <section className="borrow" aria-label="Route amount">
           <label className="borrow-input-label" htmlFor="route-amount">Route amount</label>
@@ -266,21 +265,22 @@ function App() {
             );
             const pickerOpen = openRoute === route.id;
             const isLiveUniswap = route.id === "ethereum" && selected.id === "uniswap";
-            const displayedOutput = isLiveUniswap
-              ? liveQuote ? formatUsdt(liveQuote.amountOut) : null
+            const displayedOutput = isLiveUniswap && liveQuote
+              ? formatUsdt(liveQuote.amountOut)
               : formatScaledAmount(selected.output ?? "", capitalAmount);
             const displayedDelta = displayedOutput
               ? formatAmountDelta(displayedOutput, capitalAmount)
               : "—";
-            const displayedFee = isLiveUniswap
+            const displayedFee = isLiveUniswap && liveQuote
               ? selected.fee
               : selected.fee + " · demo";
             const displayedGas = isLiveUniswap && liveQuote
               ? Number(liveQuote.gasEstimate).toLocaleString("en-US") + " units"
-              : selected.gas;
+              : selected.gas + " · demo";
 
             return (
-              <article className={pickerOpen ? "route-card route-card-active" : "route-card"} key={route.id}>
+              <div className="route-column" key={route.id}>
+              <article className={pickerOpen ? "route-card route-card-active" : "route-card"}>
                 <div className="route-card-heading">
                   <div>
                     <p className="route-index">ROUTE 0{index + 1}</p>
@@ -330,12 +330,12 @@ function App() {
                             <span className="provider-option-title">
                               <span className="provider-mark provider-mark-small">{provider.mark}</span>
                               {provider.name}
-                              {provider.id === "uniswap" && liveQuote ? <span className="best-badge">LIVE</span> : provider.best && <span className="best-badge">DEMO</span>}
+                              {provider.id === "uniswap" ? <span className="best-badge">{liveQuote ? "LIVE" : "DEMO"}</span> : provider.best && <span className="best-badge">DEMO</span>}
                             </span>
                             <span className="provider-option-description">{provider.description}</span>
                           </span>
                           <span className="provider-option-quote">
-                            {provider.id === "uniswap" ? (liveQuote ? formatUsdt(liveQuote.amountOut) : "—") : formatScaledAmount(provider.output ?? "", capitalAmount)}
+                            {provider.id === "uniswap" && liveQuote ? formatUsdt(liveQuote.amountOut) : formatScaledAmount(provider.output ?? "", capitalAmount)}
                             <span>USDT out</span>
                           </span>
                         </button>
@@ -346,16 +346,8 @@ function App() {
                 )}
 
                 <div className="route-result" aria-live="polite">
-                  {isLiveUniswap && (
-                    <p className={quoteStatus === "error" ? "quote-status quote-error" : "quote-status"} role="status">
-                      {quoteStatus === "loading" && "Fetching a read-only Uniswap quote…"}
-                      {quoteStatus === "ready" && liveQuote && "LIVE ON-CHAIN QUOTE · BLOCK " + liveQuote.blockNumber}
-                      {quoteStatus === "error" && quoteError}
-                      {quoteStatus === "idle" && (walletAddress ? "Waiting for quote…" : "Connect a wallet to fetch a live quote. No transaction will be sent.")}
-                    </p>
-                  )}
                   <div className="result-label">Estimated final amount</div>
-                  <div className="result-amount">{displayedOutput ?? (quoteStatus === "error" ? "Unavailable" : "Connect wallet")} {displayedOutput && <span>USDT</span>}</div>
+                  <div className="result-amount">{displayedOutput ?? "—"} {displayedOutput && <span>USDT</span>}</div>
                   <div className="result-metrics">
                     <div><span>Gross delta</span><strong className="profit-value">{displayedDelta}</strong></div>
                     <div><span>Swap fee</span><strong>{displayedFee}</strong></div>
@@ -367,10 +359,25 @@ function App() {
                   </div>
                 </div>
               </article>
+              </div>
             );
           })}
         </section>
 
+        <aside className={walletError || quoteStatus === "error" ? "route-warning route-warning-error" : "route-warning"} role={walletError || quoteStatus === "error" ? "alert" : "status"}>
+          <span className="warning-mark" aria-hidden="true">!</span>
+          <span>
+            {walletError || (quoteStatus === "error"
+              ? quoteError
+              : quoteStatus === "loading"
+                ? "Fetching a read-only Uniswap V3 quote from Ethereum Mainnet…"
+                : quoteStatus === "ready" && liveQuote
+                  ? "Live Ethereum quote received at block " + liveQuote.blockNumber + ". Uniswap uses on-chain data; other providers still show demo figures."
+                  : walletAddress
+                    ? "Connect to Ethereum Mainnet and enter a valid amount for a live quote."
+                    : "Connect your wallet above to load a live Ethereum quote. Until then, the figures marked DEMO are examples. No transaction will be sent.")}
+          </span>
+        </aside>
         <p className="workspace-footnote">Gross delta is output minus input; it excludes loan fees and full transaction gas. Only the Ethereum Uniswap V3 quote is on-chain; other providers remain demo data.</p>
       </div>
     </main>
