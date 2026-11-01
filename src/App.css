@@ -276,6 +276,36 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .warning-mark { width: 16px; height: 16px; flex: 0 0 16px; display: grid; place-items: center; border: 1px solid #aa8b42; border-radius: 50%; color: #e1c578; font: 700 10px var(--mono); }
 .route-warning-error { border-color: #633b42; color: #f1a3a6; background: #25171b; }
 .route-warning-error .warning-mark { border-color: #a4525c; color: #ffb0b2; }
+
+.route-continue-button { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; padding: 10px 11px; border: 1px solid #483b69; border-radius: 9px; color: #c9b8ff; background: #171625; text-align: left; cursor: pointer; transition: border-color .18s, background .18s, transform .18s; }
+.route-continue-button:hover { transform: translateY(-1px); border-color: #9a72ff; background: #211d30; }
+.route-continue-button > span { color: #aab3c2; font-size: 10px; }
+.route-continue-button strong { color: #eee7ff; font-size: 11px; font-weight: 550; white-space: nowrap; }
+.route-continue-button strong span { margin-left: 3px; color: #a98bff; }
+.review-sign-button { padding: 10px 14px; border: 1px solid #9a72ff; border-radius: 8px; color: #f4efff; background: #302344; font-size: 11px; font-weight: 600; cursor: pointer; transition: background .18s, transform .18s; }
+.review-sign-button:hover { background: #493266; transform: translateY(-1px); }
+.review-overlay { position: fixed; z-index: 20; inset: 0; display: grid; place-items: center; padding: 20px; background: #05080dcc; backdrop-filter: blur(8px); animation: picker-in .16s ease-out; }
+.review-dialog { width: min(100%, 510px); max-height: min(90vh, 760px); overflow: auto; padding: 22px; border: 1px solid #3a3b51; border-radius: 16px; color: #eef2f7; background: #111821; box-shadow: 0 28px 90px #000a; }
+.review-dialog-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.review-dialog-heading .eyebrow { color: #aa93ea; font: 10px var(--mono); }
+.review-dialog-heading h2 { margin: 6px 0 0; font-size: 21px; font-weight: 550; letter-spacing: -.03em; }
+.review-close { width: 32px; height: 32px; border: 1px solid #303b4b; border-radius: 8px; color: #aeb8c8; background: #171f2a; font-size: 21px; line-height: 1; cursor: pointer; }
+.review-safety-note { margin: 17px 0 0; padding: 11px 12px; border: 1px solid #5c4b28; border-radius: 9px; color: #e0ca8b; background: #211d13; font-size: 11px; line-height: 1.55; }
+.review-details { display: grid; gap: 0; margin: 17px 0 0; }
+.review-details > div { display: flex; justify-content: space-between; gap: 14px; padding: 11px 0; border-bottom: 1px solid #273240; }
+.review-details dt { color: #92a0b1; font-size: 11px; }
+.review-details dd { margin: 0; color: #edf2f8; font-size: 11px; font-weight: 500; text-align: right; }
+.review-details dd span { display: block; margin-top: 3px; color: #9a72ff; font-size: 9px; font-weight: 400; }
+.signature-success { margin: 14px 0 0; padding: 10px 12px; border: 1px solid #285441; border-radius: 8px; color: #9de1be; background: #14261f; font-size: 11px; line-height: 1.45; }
+.review-dialog-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 19px; }
+.review-cancel-button { padding: 10px 13px; border: 1px solid #303b4b; border-radius: 8px; color: #bac3cf; background: #171f2a; font-size: 11px; cursor: pointer; }
+.review-cancel-button:hover { border-color: #68768a; }
+.review-sign-button:disabled { opacity: .7; cursor: default; transform: none; }
+@media (max-width: 600px) {
+  .review-dialog { padding: 18px; }
+  .review-details > div { align-items: flex-start; flex-direction: column; gap: 5px; }
+  .review-details dd { text-align: left; }
+}
 @media (max-width: 1050px) {
   .route-column:last-child { grid-column: 1 / -1; }
 }
@@ -283,3 +313,25 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
   .route-column:last-child { grid-column: auto; }
 }
 
+
+/* Dedicated funding board: borrow inputs and payoff details sit apart from swap routes. */
+.borrow-board { margin-bottom: 17px; padding: 16px; border-color: #34304b; background: linear-gradient(135deg, #141923, #111821 65%, #191727); }
+.borrow-board .capital-heading { align-items: center; }
+.borrow-heading-copy { display: block !important; }
+.borrow-heading-copy .field-caption { margin: 0 0 5px !important; color: #aa93ea; font: 10px var(--mono); letter-spacing: .1em; }
+.borrow-heading-copy h2 { margin: 0; color: #eef2f7; font-size: 15px; font-weight: 550; }
+.borrow-heading-copy > p:last-child { margin: 4px 0 0; color: #92a0b1; font-size: 10px; }
+.borrow-summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; margin-top: 14px; }
+.borrow-summary-item { min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 8px; padding: 11px; border: 1px solid #273240; border-radius: 9px; color: #92a0b1; background: #171f2a; font-size: 10px; }
+.borrow-summary-item strong { overflow-wrap: anywhere; color: #eef2f7; font-size: 11px; font-weight: 500; }
+.borrow-summary-item select, .borrow-summary-item input { width: 100%; min-width: 0; padding: 8px 9px; border: 1px solid #303b4b; border-radius: 7px; color: #e7ebf2; background: #111821; font-size: 11px; }
+.borrow-board .capital-note { margin: 11px 0 0; padding: 0; border: 0; font-size: 10px; }
+.borrow-board .collateral-fields { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; margin-top: 14px; padding: 0; border: 0; }
+.borrow-board .collateral-fields p { grid-column: 1 / -1; margin: 2px 0 0; }
+@media (max-width: 850px) { .borrow-summary-grid, .borrow-board .collateral-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px) {
+  .borrow-board .capital-heading { align-items: flex-start; flex-direction: column; }
+  .borrow-summary-grid, .borrow-board .collateral-fields { grid-template-columns: minmax(0, 1fr); }
+}
+.route-continue-button:disabled { opacity: .58; cursor: not-allowed; transform: none; }
+.route-continue-button:disabled:hover { border-color: #483b69; background: #171625; transform: none; }

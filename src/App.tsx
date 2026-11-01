@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { BrowserProvider, type Eip1193Provider } from "ethers";
 import { quoteEthereumUniswapCycle, type LiveEthereumQuote } from "./services/uniswapQuote";
+import { quoteSolanaCycle, type LiveSolanaQuote } from "./services/jupiterQuote";
+import { quoteBalancerCycle, quoteSushiCycle, type LiveEthereumDexQuote } from "./services/ethereumDexQuotes";
 import "./App.css";
 
 type ProviderQuote = {
@@ -18,7 +20,6 @@ type Route = {
   id: string;
   title: string;
   network: string;
-  family: string;
   tokens: string[];
   providers: ProviderQuote[];
 };
@@ -28,22 +29,20 @@ const routes: Route[] = [
     id: "ethereum",
     title: "Ethereum",
     network: "Ethereum Mainnet · Chain 1",
-    family: "EVM",
     tokens: ["USDT", "WETH", "USDC", "USDT"],
     providers: [
-      { id: "uniswap", name: "Uniswap V3", mark: "UNI", description: "Three-hop route · live quote when connected", output: "10,042.18", fee: "0.05% · 0.05% · 0.01%", gas: "165k units" },
-      { id: "sushi", name: "SushiSwap", mark: "S", description: "Constant-product pool · demo quote", output: "10,033.64", fee: "0.30%", gas: "157k units" },
-      { id: "balancer", name: "Balancer", mark: "B", description: "Weighted pool · demo quote", output: "10,026.30", fee: "0.10%", gas: "157k units" },
+      { id: "uniswap", name: "Uniswap V3", mark: "UNI", description: "Three-hop route · live quote when connected", fee: "0.05% · 0.05% · 0.01%", gas: "165k units" },
+      { id: "sushi", name: "SushiSwap", mark: "S", description: "Sushi V2 route · live on-chain quote", fee: "0.30%", gas: "157k units" },
+      { id: "balancer", name: "Balancer", mark: "B", description: "Balancer SOR route · live pool quote", fee: "0.10%", gas: "157k units" },
     ],
   },
   {
     id: "solana",
     title: "Solana",
     network: "Solana Mainnet",
-    family: "SVM",
     tokens: ["USDT", "SOL", "USDC", "USDT"],
     providers: [
-      { id: "jupiter", name: "Jupiter", mark: "JUP", description: "Aggregator route · demo quote", output: "10,031.46", fee: "0.20%", gas: "0.0008 SOL", best: true },
+      { id: "jupiter", name: "Jupiter", mark: "JUP", description: "Meta-aggregator route · live read-only quote", output: "10,031.46", fee: "0.20%", gas: "0.0008 SOL", best: true },
       { id: "raydium", name: "Raydium", mark: "R", description: "AMM route · demo quote", output: "10,028.10", fee: "0.25%", gas: "0.0007 SOL" },
     ],
   },
@@ -51,7 +50,6 @@ const routes: Route[] = [
     id: "other",
     title: "Other network",
     network: "Base, BNB Chain, or Polygon",
-    family: "EVM",
     tokens: ["USDT", "WETH", "USDC", "USDT"],
     providers: [
       { id: "aerodrome", name: "Aerodrome · Base", mark: "A", description: "Base network · demo quote", output: "10,019.88", fee: "0.30%", gas: "142k units", best: true },
@@ -102,13 +100,26 @@ function formatAmountDelta(output: string, input: string): string {
 
 function App() {
   const [capitalMode, setCapitalMode] = useState<"flash" | "collateral">("flash");
+  const [flashProvider, setFlashProvider] = useState("Aave V3");
   const [capitalAmount, setCapitalAmount] = useState("10000");
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [readProvider, setReadProvider] = useState<BrowserProvider | null>(null);
   const [liveQuote, setLiveQuote] = useState<LiveEthereumQuote | null>(null);
   const [quoteStatus, setQuoteStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [quoteError, setQuoteError] = useState("");
+  const [liveSushiQuote, setLiveSushiQuote] = useState<LiveEthereumDexQuote | null>(null);
+  const [sushiQuoteStatus, setSushiQuoteStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [sushiQuoteError, setSushiQuoteError] = useState("");
+  const [liveBalancerQuote, setLiveBalancerQuote] = useState<LiveEthereumDexQuote | null>(null);
+  const [balancerQuoteStatus, setBalancerQuoteStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [balancerQuoteError, setBalancerQuoteError] = useState("");
+  const [liveSolanaQuote, setLiveSolanaQuote] = useState<LiveSolanaQuote | null>(null);
+  const [solanaQuoteStatus, setSolanaQuoteStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [solanaQuoteError, setSolanaQuoteError] = useState("");
   const [walletError, setWalletError] = useState("");
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewRouteId, setReviewRouteId] = useState("ethereum");
+  const [signatureSimulated, setSignatureSimulated] = useState(false);
   const [openRoute, setOpenRoute] = useState<string | null>("ethereum");
   const [search, setSearch] = useState("");
   const [selectedProviders, setSelectedProviders] = useState<Record<string, string>>({
@@ -170,10 +181,143 @@ function App() {
     };
   }, [capitalAmount, readProvider]);
 
+  useEffect(() => {
+    if (!readProvider) {
+      setLiveSushiQuote(null);
+      setSushiQuoteStatus("idle");
+      setSushiQuoteError("");
+      return;
+    }
+    if (!capitalAmount.trim() || !Number.isFinite(Number(capitalAmount)) || Number(capitalAmount) <= 0) {
+      setLiveSushiQuote(null);
+      setSushiQuoteStatus("idle");
+      setSushiQuoteError("");
+      return;
+    }
+
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      setSushiQuoteStatus("loading");
+      setSushiQuoteError("");
+      setLiveSushiQuote(null);
+      try {
+        const quote = await quoteSushiCycle(capitalAmount, readProvider);
+        if (!cancelled) {
+          setLiveSushiQuote(quote);
+          setSushiQuoteStatus("ready");
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setSushiQuoteStatus("error");
+          setSushiQuoteError(error instanceof Error ? error.message : "Could not fetch a SushiSwap quote.");
+        }
+      }
+    }, 350);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [capitalAmount, readProvider]);
+
+  useEffect(() => {
+    if (!capitalAmount.trim() || !/^\d+(\.\d*)?$/.test(capitalAmount) || Number(capitalAmount) <= 0) {
+      setLiveBalancerQuote(null);
+      setBalancerQuoteStatus("idle");
+      setBalancerQuoteError("");
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setBalancerQuoteStatus("loading");
+      setBalancerQuoteError("");
+      setLiveBalancerQuote(null);
+      try {
+        const quote = await quoteBalancerCycle(capitalAmount, controller.signal);
+        if (!controller.signal.aborted) {
+          setLiveBalancerQuote(quote);
+          setBalancerQuoteStatus("ready");
+        }
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setBalancerQuoteStatus("error");
+          setBalancerQuoteError(error instanceof Error ? error.message : "Could not fetch a Balancer quote.");
+        }
+      }
+    }, 450);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [capitalAmount]);
+
+  useEffect(() => {
+    if (selectedProviders.solana !== "jupiter") {
+      setLiveSolanaQuote(null);
+      setSolanaQuoteStatus("idle");
+      setSolanaQuoteError("");
+      return;
+    }
+    if (!capitalAmount.trim() || !/^\d+(\.\d*)?$/.test(capitalAmount) || Number(capitalAmount) <= 0) {
+      setLiveSolanaQuote(null);
+      setSolanaQuoteStatus("idle");
+      setSolanaQuoteError("");
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setSolanaQuoteStatus("loading");
+      setSolanaQuoteError("");
+      setLiveSolanaQuote(null);
+      try {
+        const quote = await quoteSolanaCycle(capitalAmount, controller.signal);
+        if (!controller.signal.aborted) {
+          setLiveSolanaQuote(quote);
+          setSolanaQuoteStatus("ready");
+        }
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setSolanaQuoteStatus("error");
+          setSolanaQuoteError(error instanceof Error ? error.message : "Could not fetch a Jupiter quote.");
+        }
+      }
+    }, 500);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [capitalAmount, selectedProviders.solana]);
+
+  useEffect(() => {
+    if (!reviewOpen) return;
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setReviewOpen(false);
+    }
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [reviewOpen]);
+
   function chooseProvider(routeId: string, providerId: string) {
     setSelectedProviders((current) => ({ ...current, [routeId]: providerId }));
     setOpenRoute(null);
     setSearch("");
+  }
+
+  const pageNoticeError = Boolean(walletError || quoteStatus === "error" || sushiQuoteStatus === "error" || balancerQuoteStatus === "error" || solanaQuoteStatus === "error");
+  let pageNotice = "Balancer is requesting a live pool quote. Connect an Ethereum wallet to quote Uniswap and SushiSwap.";
+  if (walletError) pageNotice = walletError;
+  else if (solanaQuoteStatus === "error") pageNotice = solanaQuoteError;
+  else if (quoteStatus === "error") pageNotice = quoteError;
+  else if (sushiQuoteStatus === "error") pageNotice = sushiQuoteError;
+  else if (balancerQuoteStatus === "error") pageNotice = balancerQuoteError;
+  else if (solanaQuoteStatus === "loading") pageNotice = "Requesting three read-only Jupiter quotes. This route can take a few seconds due to public API rate limits.";
+  else if (quoteStatus === "loading" || sushiQuoteStatus === "loading" || balancerQuoteStatus === "loading") pageNotice = "Loading live Ethereum provider quotes. Uniswap and SushiSwap use your connected Ethereum wallet; Balancer uses its Smart Order Router.";
+  else if ((quoteStatus === "ready" && liveQuote) || (sushiQuoteStatus === "ready" && liveSushiQuote) || (balancerQuoteStatus === "ready" && liveBalancerQuote) || (solanaQuoteStatus === "ready" && liveSolanaQuote)) {
+    pageNotice = "Ethereum quotes are live for Uniswap, SushiSwap, and Balancer when their status reads LIVE. Solana Jupiter is quote-only; no transaction is sent.";
   }
 
   return (
@@ -198,11 +342,11 @@ function App() {
             <h1>Choose an execution provider</h1>
             <p className="heading-copy">Compare provider quotes across three fixed network routes.</p>
           </div>
-          <span className="demo-banner">UNISWAP V3 LIVE WHEN CONNECTED · OTHERS DEMO</span>
+          <span className="demo-banner">LIVE QUOTES · UNISWAP · SUSHISWAP · BALANCER · JUPITER</span>
         </section>
 
         <section className="borrow" aria-label="Route amount">
-          <label className="borrow-input-label" htmlFor="route-amount">Route amount</label>
+          <label className="borrow-input-label" htmlFor="route-amount">Borrow amount</label>
           <div className="borrow-input-wrap">
             <input
               id="route-amount"
@@ -211,30 +355,46 @@ function App() {
               step="any"
               inputMode="decimal"
               value={capitalAmount}
-              onChange={(event) => { setCapitalAmount(event.target.value); setLiveQuote(null); setQuoteStatus("idle"); setQuoteError(""); }}
+              onChange={(event) => { setCapitalAmount(event.target.value); setLiveQuote(null); setQuoteStatus("idle"); setQuoteError(""); setLiveSushiQuote(null); setSushiQuoteStatus("idle"); setSushiQuoteError(""); setLiveBalancerQuote(null); setBalancerQuoteStatus("idle"); setBalancerQuoteError(""); setLiveSolanaQuote(null); setSolanaQuoteStatus("idle"); setSolanaQuoteError(""); }}
               aria-describedby="amount-note"
             />
             <span>USDT</span>
           </div>
           <span className="borrow-pill">Flash route closes in USDT</span>
-          <span className="borrow-hint" id="amount-note">Demo providers scale proportionally; Uniswap reads the current on-chain quote.</span>
+          <span className="borrow-hint" id="amount-note">Ethereum and Jupiter use live quotes. Demo providers are marked.</span>
         </section>
 
-        <section className="capital-panel" aria-label="Simulation capital source">
+        <section className="capital-panel borrow-board" aria-label="Borrow setup">
           <div className="capital-heading">
-            <div>
-              <p className="field-caption">CAPITAL SOURCE</p>
-              <div className="capital-switch" role="group" aria-label="Capital source">
-                <button className={capitalMode === "flash" ? "mode-button mode-selected" : "mode-button"} type="button" aria-pressed={capitalMode === "flash"} onClick={() => setCapitalMode("flash")}>Flash loan</button>
-                <button className={capitalMode === "collateral" ? "mode-button mode-selected" : "mode-button"} type="button" aria-pressed={capitalMode === "collateral"} onClick={() => setCapitalMode("collateral")}>Collateral borrow</button>
-              </div>
+            <div className="borrow-heading-copy">
+              <p className="field-caption">FUNDING · STEP 02</p>
+              <h2>Borrow setup</h2>
+              <p>Choose where the route gets its starting capital.</p>
+            </div>
+            <div className="capital-switch" role="group" aria-label="Borrow type">
+              <button className={capitalMode === "flash" ? "mode-button mode-selected" : "mode-button"} type="button" aria-pressed={capitalMode === "flash"} onClick={() => setCapitalMode("flash")}>Flash loan</button>
+              <button className={capitalMode === "collateral" ? "mode-button mode-selected" : "mode-button"} type="button" aria-pressed={capitalMode === "collateral"} onClick={() => setCapitalMode("collateral")}>Collateral borrow</button>
             </div>
           </div>
           {capitalMode === "flash" ? (
-            <p className="capital-note">No collateral is posted for the flash loan. The route must return USDT plus its fee in the same transaction.</p>
+            <>
+              <div className="borrow-summary-grid">
+                <label className="borrow-summary-item borrow-source-select">
+                  <span>Loan provider</span>
+                  <select value={flashProvider} onChange={(event) => setFlashProvider(event.target.value)}>
+                    <option>Aave V3</option>
+                    <option>Uniswap V3</option>
+                  </select>
+                </label>
+                <div className="borrow-summary-item"><span>Loan principal</span><strong>{formatUsdt(capitalAmount)} USDT</strong></div>
+                <div className="borrow-summary-item"><span>Loan fee</span><strong>Provider quote required</strong></div>
+                <div className="borrow-summary-item"><span>Repayment</span><strong>Principal + fee · same transaction</strong></div>
+              </div>
+              <p className="capital-note">This board configures the funding leg. The app does not request a loan; the lender fee and repayment check are not connected yet.</p>
+            </>
           ) : (
-            <div className="collateral-fields">
-              <label>
+            <div className="collateral-fields borrow-summary-grid">
+              <label className="borrow-summary-item">
                 Collateral asset
                 <select defaultValue="USDT">
                   <option>USDT · if eligible</option>
@@ -242,15 +402,20 @@ function App() {
                   <option>Other supported asset</option>
                 </select>
               </label>
-              <label>
+              <label className="borrow-summary-item">
+                Collateral amount
+                <input type="number" min="0" defaultValue="15000" />
+              </label>
+              <label className="borrow-summary-item">
                 Borrow asset
-                <select defaultValue="WETH">
+                <select defaultValue="USDT">
+                  <option>USDT</option>
                   <option>WETH</option>
                   <option>USDC</option>
-                  <option>USDT</option>
                 </select>
               </label>
-              <p>Borrowing adds interest and liquidation risk. Only market-supported assets are available.</p>
+              <div className="borrow-summary-item"><span>Borrow amount</span><strong>{formatUsdt(capitalAmount)} USDT</strong></div>
+              <p className="capital-note">Collateral factor, interest, and liquidation risk require live lending-market data and are not estimated here.</p>
             </div>
           )}
         </section>
@@ -265,18 +430,55 @@ function App() {
             );
             const pickerOpen = openRoute === route.id;
             const isLiveUniswap = route.id === "ethereum" && selected.id === "uniswap";
-            const displayedOutput = isLiveUniswap && liveQuote
-              ? formatUsdt(liveQuote.amountOut)
-              : formatScaledAmount(selected.output ?? "", capitalAmount);
-            const displayedDelta = displayedOutput
+            const isLiveJupiter = route.id === "solana" && selected.id === "jupiter";
+            const isEthereumRoute = route.id === "ethereum";
+            const quoteForEthereumProvider = (providerId: string) =>
+              providerId === "uniswap" ? liveQuote
+                : providerId === "sushi" ? liveSushiQuote
+                  : providerId === "balancer" ? liveBalancerQuote
+                    : null;
+            const statusForEthereumProvider = (providerId: string) =>
+              providerId === "uniswap" ? quoteStatus
+                : providerId === "sushi" ? sushiQuoteStatus
+                  : providerId === "balancer" ? balancerQuoteStatus
+                    : "idle";
+            const selectedEthereumQuote = isEthereumRoute ? quoteForEthereumProvider(selected.id) : null;
+            const displayedOutput = isEthereumRoute
+              ? selectedEthereumQuote ? formatUsdt(selectedEthereumQuote.amountOut) : "—"
+              : isLiveJupiter && liveSolanaQuote
+                ? formatUsdt(liveSolanaQuote.amountOut)
+                : formatScaledAmount(selected.output ?? "", capitalAmount);
+            const displayedDelta = displayedOutput !== "—"
               ? formatAmountDelta(displayedOutput, capitalAmount)
               : "—";
-            const displayedFee = isLiveUniswap && liveQuote
-              ? selected.fee
-              : selected.fee + " · demo";
-            const displayedGas = isLiveUniswap && liveQuote
-              ? Number(liveQuote.gasEstimate).toLocaleString("en-US") + " units"
-              : selected.gas + " · demo";
+            const displayedFee = isEthereumRoute
+              ? isLiveUniswap && liveQuote ? selected.fee
+                : selectedEthereumQuote && "feeDescription" in selectedEthereumQuote
+                  ? selectedEthereumQuote.feeDescription
+                  : statusForEthereumProvider(selected.id) === "loading" ? "Quoting…" : statusForEthereumProvider(selected.id) === "error" ? "Quote unavailable" : selected.id === "balancer" ? "Waiting for quote" : "Connect wallet"
+              : isLiveJupiter && liveSolanaQuote
+                ? "DEX fees reflected in quote"
+                : selected.fee + " · demo";
+            const displayedGas = isEthereumRoute
+              ? selectedEthereumQuote?.gasEstimate
+                ? Number(selectedEthereumQuote.gasEstimate).toLocaleString("en-US") + " units"
+                : selectedEthereumQuote && "gasDescription" in selectedEthereumQuote
+                  ? selectedEthereumQuote.gasDescription
+                  : statusForEthereumProvider(selected.id) === "loading" ? "Quoting…" : statusForEthereumProvider(selected.id) === "error" ? "Quote unavailable" : selected.id === "balancer" ? "Waiting for quote" : "Connect wallet"
+              : isLiveJupiter && liveSolanaQuote
+                ? "Not included in quote"
+                : selected.gas + " · demo";
+            const liveOutputForPicker = (providerId: string) => {
+              if (isEthereumRoute) {
+                const quote = quoteForEthereumProvider(providerId);
+                return quote ? formatUsdt(quote.amountOut) : "—";
+              }
+              return providerId === "uniswap" && liveQuote
+                ? formatUsdt(liveQuote.amountOut)
+                : providerId === "jupiter" && liveSolanaQuote
+                  ? formatUsdt(liveSolanaQuote.amountOut)
+                  : null;
+            };
 
             return (
               <div className="route-column" key={route.id}>
@@ -287,7 +489,6 @@ function App() {
                     <h2>{route.title}</h2>
                     <p className="network-name">{route.network}</p>
                   </div>
-                  <span className="network-family">{route.family}</span>
                 </div>
 
 
@@ -330,12 +531,12 @@ function App() {
                             <span className="provider-option-title">
                               <span className="provider-mark provider-mark-small">{provider.mark}</span>
                               {provider.name}
-                              {provider.id === "uniswap" ? <span className="best-badge">{liveQuote ? "LIVE" : "DEMO"}</span> : provider.best && <span className="best-badge">DEMO</span>}
+                              {route.id === "ethereum" ? <span className="best-badge">{quoteForEthereumProvider(provider.id) ? "LIVE" : statusForEthereumProvider(provider.id) === "loading" ? "QUOTING" : statusForEthereumProvider(provider.id) === "error" ? "UNAVAILABLE" : provider.id === "balancer" ? "LIVE QUOTE" : "CONNECT WALLET"}</span> : provider.id === "jupiter" ? <span className="best-badge">{liveSolanaQuote ? "LIVE" : solanaQuoteStatus === "loading" ? "QUOTING" : "LIVE QUOTE"}</span> : provider.best && <span className="best-badge">DEMO</span>}
                             </span>
                             <span className="provider-option-description">{provider.description}</span>
                           </span>
                           <span className="provider-option-quote">
-                            {provider.id === "uniswap" && liveQuote ? formatUsdt(liveQuote.amountOut) : formatScaledAmount(provider.output ?? "", capitalAmount)}
+                            {liveOutputForPicker(provider.id) ?? formatScaledAmount(provider.output ?? "", capitalAmount)}
                             <span>USDT out</span>
                           </span>
                         </button>
@@ -347,7 +548,7 @@ function App() {
 
                 <div className="route-result" aria-live="polite">
                   <div className="result-label">Estimated final amount</div>
-                  <div className="result-amount">{displayedOutput ?? "—"} {displayedOutput && <span>USDT</span>}</div>
+                  <div className="result-amount">{displayedOutput} {displayedOutput !== "—" && <span>USDT</span>}</div>
                   <div className="result-metrics">
                     <div><span>Gross delta</span><strong className="profit-value">{displayedDelta}</strong></div>
                     <div><span>Swap fee</span><strong>{displayedFee}</strong></div>
@@ -355,8 +556,17 @@ function App() {
                   </div>
                   <div className="route-footer">
                     <span>{route.tokens.map((token, tokenIndex) => <span key={route.id + "-path-" + tokenIndex}>{tokenIndex > 0 && <span className="path-divider"> → </span>}{token}</span>)}</span>
-                    <span className="demo-tag">{isLiveUniswap && liveQuote ? "ON-CHAIN" : "DEMO"}</span>
+                    <span className="demo-tag">{isEthereumRoute ? selectedEthereumQuote ? "LIVE QUOTE" : statusForEthereumProvider(selected.id) === "loading" ? "QUOTING" : "QUOTE UNAVAILABLE" : isLiveJupiter && liveSolanaQuote ? "LIVE QUOTE" : "DEMO"}</span>
                   </div>
+                  <button
+                    className="route-continue-button"
+                    type="button"
+                    disabled={isEthereumRoute && !selectedEthereumQuote}
+                    onClick={() => { setReviewRouteId(route.id); setSignatureSimulated(false); setReviewOpen(true); }}
+                  >
+                    <span>Continue with quoted rate</span>
+                    <strong>{displayedOutput === "—" ? statusForEthereumProvider(selected.id) === "loading" ? "Getting live quote…" : selected.id === "balancer" || readProvider ? "Quote unavailable" : "Connect wallet to quote" : <>{displayedOutput} USDT <span aria-hidden="true">↗</span></>}</strong>
+                  </button>
                 </div>
               </article>
               </div>
@@ -364,22 +574,63 @@ function App() {
           })}
         </section>
 
-        <aside className={walletError || quoteStatus === "error" ? "route-warning route-warning-error" : "route-warning"} role={walletError || quoteStatus === "error" ? "alert" : "status"}>
+        <aside className={pageNoticeError ? "route-warning route-warning-error" : "route-warning"} role={pageNoticeError ? "alert" : "status"}>
           <span className="warning-mark" aria-hidden="true">!</span>
-          <span>
-            {walletError || (quoteStatus === "error"
-              ? quoteError
-              : quoteStatus === "loading"
-                ? "Fetching a read-only Uniswap V3 quote from Ethereum Mainnet…"
-                : quoteStatus === "ready" && liveQuote
-                  ? "Live Ethereum quote received at block " + liveQuote.blockNumber + ". Uniswap uses on-chain data; other providers still show demo figures."
-                  : walletAddress
-                    ? "Connect to Ethereum Mainnet and enter a valid amount for a live quote."
-                    : "Connect your wallet above to load a live Ethereum quote. Until then, the figures marked DEMO are examples. No transaction will be sent.")}
-          </span>
+          <span>{pageNotice}</span>
         </aside>
-        <p className="workspace-footnote">Gross delta is output minus input; it excludes loan fees and full transaction gas. Only the Ethereum Uniswap V3 quote is on-chain; other providers remain demo data.</p>
+        <p className="workspace-footnote">All quotes are read-only and exclude flash-loan fees and full transaction costs. Ethereum Uniswap, SushiSwap, and Balancer use live quote sources; Jupiter uses live Solana quotes. Balancer and Jupiter fetch their cycle quotes one hop at a time, so the quote sequence is not an atomic flash-loan simulation. Other network providers remain examples.</p>
       </div>
+
+      {reviewOpen && (() => {
+        const reviewRoute = routes.find((route) => route.id === reviewRouteId) ?? routes[0];
+        const reviewProvider = reviewRoute.providers.find((provider) => provider.id === selectedProviders[reviewRoute.id]) ?? reviewRoute.providers[0];
+        const isLiveUniswapReview = reviewRoute.id === "ethereum" && reviewProvider.id === "uniswap" && Boolean(liveQuote);
+        const isLiveSushiReview = reviewRoute.id === "ethereum" && reviewProvider.id === "sushi" && Boolean(liveSushiQuote);
+        const isLiveBalancerReview = reviewRoute.id === "ethereum" && reviewProvider.id === "balancer" && Boolean(liveBalancerQuote);
+        const isLiveJupiterReview = reviewRoute.id === "solana" && reviewProvider.id === "jupiter" && Boolean(liveSolanaQuote);
+        const isEthereumReview = reviewRoute.id === "ethereum";
+        const reviewEthereumQuote = reviewProvider.id === "uniswap" ? liveQuote : reviewProvider.id === "sushi" ? liveSushiQuote : reviewProvider.id === "balancer" ? liveBalancerQuote : null;
+        const output = isEthereumReview
+          ? reviewEthereumQuote ? formatUsdt(reviewEthereumQuote.amountOut) : "—"
+          : isLiveJupiterReview && liveSolanaQuote
+            ? formatUsdt(liveSolanaQuote.amountOut)
+            : formatScaledAmount(reviewProvider.output ?? "", capitalAmount);
+        const quoteIsLive = isLiveUniswapReview || isLiveSushiReview || isLiveBalancerReview || isLiveJupiterReview;
+
+        return (
+          <div className="review-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setReviewOpen(false); }}>
+            <section className="review-dialog" role="dialog" aria-modal="true" aria-labelledby="review-title" aria-describedby="review-description">
+              <div className="review-dialog-heading">
+                <div>
+                  <p className="eyebrow">{reviewRoute.network.toUpperCase()}</p>
+                  <h2 id="review-title">Review transaction</h2>
+                </div>
+                <button className="review-close" type="button" aria-label="Close review" autoFocus onClick={() => setReviewOpen(false)}>×</button>
+              </div>
+              <p className="review-safety-note" id="review-description">
+                This is a portfolio demo. The button below simulates a signature in the interface; it will not open MetaMask, sign a real transaction, or send anything.
+              </p>
+              <dl className="review-details">
+                <div><dt>Network</dt><dd>{reviewRoute.title}</dd></div>
+                <div><dt>Provider</dt><dd>{reviewProvider.name}</dd></div>
+                <div><dt>Route</dt><dd>{reviewRoute.tokens.join(" → ")}</dd></div>
+                <div><dt>Capital source</dt><dd>{capitalMode === "flash" ? flashProvider + " flash loan" : "Collateral borrow"}</dd></div>
+                <div><dt>Borrow amount</dt><dd>{formatUsdt(capitalAmount)} USDT</dd></div>
+                <div><dt>Estimated output</dt><dd>{output}{output !== "—" ? " USDT" : ""} <span>{quoteIsLive ? "LIVE QUOTE" : isEthereumReview ? "QUOTE UNAVAILABLE" : "DEMO FIGURE"}</span></dd></div>
+                <div><dt>Gross delta</dt><dd>{formatAmountDelta(output, capitalAmount)} <span>before fees and gas</span></dd></div>
+                <div><dt>Transaction</dt><dd>Review only · not executable</dd></div>
+              </dl>
+              {signatureSimulated && <p className="signature-success" role="status">Demo signature complete. No wallet signature or transaction was created.</p>}
+              <div className="review-dialog-actions">
+                <button className="review-cancel-button" type="button" onClick={() => setReviewOpen(false)}>Back to route</button>
+                <button className="review-sign-button" type="button" onClick={() => setSignatureSimulated(true)}>
+                  {signatureSimulated ? "Signed (demo)" : "Sign (demo only)"}
+                </button>
+              </div>
+            </section>
+          </div>
+        );
+      })()}
     </main>
   );
 }
