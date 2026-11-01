@@ -1,7 +1,5 @@
-import { useState } from "react";
 
 function App() {
-  const [swapCount, setSwapCount] = useState(0);
 
   return (
     <main>
@@ -18,56 +16,58 @@ function App() {
         <h2>New simulation</h2>
         <p>Your route workspace will appear here as we build it.</p>
 
-        <label>
-          Route chain{" "}
-          <select>
-            <option value="ethereum">Ethereum</option>
-            <option value="solana">Solana</option>
-            <option value="other">Base, BNB Chain, Polygon, or random</option>
-          </select>
-        </label>
+        {[
+          {
+            id: "ethereum",
+            title: "Ethereum route",
+            providers: ["Uniswap V3", "SushiSwap", "Balancer"],
+          },
+          {
+            id: "solana",
+            title: "Solana route",
+            providers: ["Jupiter", "Raydium"],
+          },
+          {
+            id: "other",
+            title: "Other network route",
+            providers: [
+              "Aerodrome (Base)",
+              "PancakeSwap (BNB Chain)",
+              "QuickSwap (Polygon)",
+            ],
+          },
+        ].map((route) => (
+          <form key={route.id}>
+            <h3>{route.title}</h3>
 
-          {Array.from({ length: swapCount }, (_, index) => (
-            <form key={index}>
-              <h3>Swap {index + 1}</h3>
+            <p>
+              <label>
+                From token{" "}
+                <input name={`${route.id}-tokenIn`} placeholder="e.g. USDC" />
+              </label>
+            </p>
 
-              <p>
-                <label>
-                  From token{" "}
-                  <input name={`tokenIn-${index}`} placeholder="e.g. USDC" />
-                </label>
-              </p>
+            <p>
+              <label>
+                To token{" "}
+                <input name={`${route.id}-tokenOut`} placeholder="e.g. WETH" />
+              </label>
+            </p>
 
-              <p>
-                <label>
-                  To token{" "}
-                  <input name={`tokenOut-${index}`} placeholder="e.g. WETH" />
-                </label>
-              </p>
-
-              <p>
-                <label>
-                  Exchange{" "}
-                  <select name={`dex-${index}`}>
-                    <option value="UniswapV3">Uniswap V3</option>
-                    <option value="Sushiswap">Sushiswap</option>
-                    <option value="Balancer">Balancer</option>
-                  </select>
-                </label>
-              </p>
-
-              <p>
-                <label>
-                  Pool address{" "}
-                  <input name={`poolAddress-${index}`} placeholder="0x..." />
-                </label>
-              </p>
-            </form>
-          ))}
-
-          <button type="button" onClick={() => setSwapCount(swapCount + 1)}>
-            Add another swap
-          </button>
+            <p>
+              <label>
+                Provider{" "}
+                <select name={`${route.id}-provider`}>
+                  {route.providers.map((provider) => (
+                    <option key={provider} value={provider}>
+                      {provider}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </p>
+          </form>
+        ))}
       </section>
     </main>
   );
