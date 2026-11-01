@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { BrowserProvider, type Eip1193Provider } from "ethers";
+import { quoteEthereumUniswapCycle, type LiveEthereumQuote } from "./services/uniswapQuote";
 import "./App.css";
 
 type ProviderQuote = {
@@ -6,8 +8,7 @@ type ProviderQuote = {
   name: string;
   mark: string;
   description: string;
-  output: string;
-  profit: string;
+  output?: string;
   fee: string;
   gas: string;
   best?: boolean;
@@ -30,9 +31,9 @@ const routes: Route[] = [
     family: "EVM",
     tokens: ["USDT", "WETH", "USDC", "USDT"],
     providers: [
-      { id: "uniswap", name: "Uniswap V3", mark: "UNI", description: "Concentrated liquidity · 0.30% pool", output: "10,042.18", profit: "+$27.91", fee: "0.30%", gas: "165k units", best: true },
-      { id: "sushi", name: "SushiSwap", mark: "S", description: "Constant-product pool · demo quote", output: "10,033.64", profit: "+$19.80", fee: "0.30%", gas: "157k units" },
-      { id: "balancer", name: "Balancer", mark: "B", description: "Weighted pool · demo quote", output: "10,026.30", profit: "+$12.46", fee: "0.10%", gas: "157k units" },
+      { id: "uniswap", name: "Uniswap V3", mark: "UNI", description: "Three-hop Ethereum route · on-chain quote", fee: "0.05% · 0.05% · 0.01%", gas: "Awaiting quote" },
+      { id: "sushi", name: "SushiSwap", mark: "S", description: "Constant-product pool · demo quote", output: "10,033.64", fee: "0.30%", gas: "157k units" },
+      { id: "balancer", name: "Balancer", mark: "B", description: "Weighted pool · demo quote", output: "10,026.30", fee: "0.10%", gas: "157k units" },
     ],
   },
   {
@@ -42,8 +43,8 @@ const routes: Route[] = [
     family: "SVM",
     tokens: ["USDT", "SOL", "USDC", "USDT"],
     providers: [
-      { id: "jupiter", name: "Jupiter", mark: "JUP", description: "Aggregator route · demo quote", output: "10,031.46", profit: "+$30.80", fee: "0.20%", gas: "0.0008 SOL", best: true },
-      { id: "raydium", name: "Raydium", mark: "R", description: "AMM route · demo quote", output: "10,028.10", profit: "+$27.42", fee: "0.25%", gas: "0.0007 SOL" },
+      { id: "jupiter", name: "Jupiter", mark: "JUP", description: "Aggregator route · demo quote", output: "10,031.46", fee: "0.20%", gas: "0.0008 SOL", best: true },
+      { id: "raydium", name: "Raydium", mark: "R", description: "AMM route · demo quote", output: "10,028.10", fee: "0.25%", gas: "0.0007 SOL" },
     ],
   },
   {
@@ -53,15 +54,61 @@ const routes: Route[] = [
     family: "EVM",
     tokens: ["USDT", "WETH", "USDC", "USDT"],
     providers: [
-      { id: "aerodrome", name: "Aerodrome · Base", mark: "A", description: "Base network · demo quote", output: "10,019.88", profit: "+$13.02", fee: "0.30%", gas: "142k units", best: true },
-      { id: "pancake", name: "PancakeSwap · BNB Chain", mark: "P", description: "BNB Chain · demo quote", output: "10,018.72", profit: "+$11.94", fee: "0.25%", gas: "156k units" },
-      { id: "quick", name: "QuickSwap · Polygon", mark: "Q", description: "Polygon network · demo quote", output: "10,015.20", profit: "+$8.31", fee: "0.30%", gas: "174k units" },
+      { id: "aerodrome", name: "Aerodrome · Base", mark: "A", description: "Base network · demo quote", output: "10,019.88", fee: "0.30%", gas: "142k units", best: true },
+      { id: "pancake", name: "PancakeSwap · BNB Chain", mark: "P", description: "BNB Chain · demo quote", output: "10,018.72", fee: "0.25%", gas: "156k units" },
+      { id: "quick", name: "QuickSwap · Polygon", mark: "Q", description: "Polygon network · demo quote", output: "10,015.20", fee: "0.30%", gas: "174k units" },
     ],
   },
 ];
 
+const BASE_CAPITAL = 10_000;
+
+function scaledValue(value: string, amount: string): number | null {
+  const inputAmount = Number(amount);
+  const baseValue = Number(value.replace(/,/g, ""));
+  if (!Number.isFinite(inputAmount) || inputAmount < 0 || !Number.isFinite(baseValue)) {
+    return null;
+  }
+  return baseValue * (inputAmount / BASE_CAPITAL);
+}
+
+function formatScaledAmount(value: string, amount: string): string {
+  const scaled = scaledValue(value, amount);
+  if (scaled === null) return "—";
+  return new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(scaled);
+}
+
+
+
+function formatUsdt(value: string): string {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return "—";
+  return new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
+function formatAmountDelta(output: string, input: string): string {
+  const outputValue = Number(output.replace(/,/g, ""));
+  const inputValue = Number(input);
+  if (!Number.isFinite(outputValue) || !Number.isFinite(inputValue)) return "—";
+  const delta = outputValue - inputValue;
+  return (delta >= 0 ? "+$" : "−$") + Math.abs(delta).toFixed(2);
+}
+
 function App() {
   const [capitalMode, setCapitalMode] = useState<"flash" | "collateral">("flash");
+  const [capitalAmount, setCapitalAmount] = useState("10000");
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [readProvider, setReadProvider] = useState<BrowserProvider | null>(null);
+  const [liveQuote, setLiveQuote] = useState<LiveEthereumQuote | null>(null);
+  const [quoteStatus, setQuoteStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [quoteError, setQuoteError] = useState("");
+  const [walletError, setWalletError] = useState("");
   const [openRoute, setOpenRoute] = useState<string | null>("ethereum");
   const [search, setSearch] = useState("");
   const [selectedProviders, setSelectedProviders] = useState<Record<string, string>>({
@@ -69,6 +116,59 @@ function App() {
     solana: "jupiter",
     other: "aerodrome",
   });
+
+  async function connectWallet() {
+    setWalletError("");
+    const injected = (window as Window & { ethereum?: Eip1193Provider }).ethereum;
+    if (!injected) {
+      setWalletError("No browser wallet found. Install or enable MetaMask, then try again.");
+      return;
+    }
+
+    try {
+      const provider = new BrowserProvider(injected);
+      const accounts = (await provider.send("eth_requestAccounts", [])) as string[];
+      if (!accounts[0]) throw new Error("Wallet connection was not approved.");
+      setWalletAddress(accounts[0]);
+      setReadProvider(provider);
+    } catch (error) {
+      setWalletError(error instanceof Error ? error.message : "Could not connect to the wallet.");
+    }
+  }
+
+  useEffect(() => {
+    if (!readProvider) return;
+    if (!capitalAmount.trim() || !Number.isFinite(Number(capitalAmount)) || Number(capitalAmount) <= 0) {
+      setLiveQuote(null);
+      setQuoteStatus("idle");
+      setQuoteError("");
+      return;
+    }
+
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      setQuoteStatus("loading");
+      setQuoteError("");
+      setLiveQuote(null);
+      try {
+        const quote = await quoteEthereumUniswapCycle(capitalAmount, readProvider);
+        if (!cancelled) {
+          setLiveQuote(quote);
+          setQuoteStatus("ready");
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setQuoteStatus("error");
+          setQuoteError(error instanceof Error ? error.message : "Could not fetch an on-chain quote.");
+        }
+      }
+    }, 350);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [capitalAmount, readProvider]);
 
   function chooseProvider(routeId: string, providerId: string) {
     setSelectedProviders((current) => ({ ...current, [routeId]: providerId }));
@@ -86,8 +186,8 @@ function App() {
           <span className="brand-section">Workspace</span>
         </div>
         <div className="topbar-actions">
-          <span className="simulation-status"><span className="status-dot" />LOCAL SIMULATION</span>
-          <button className="connect-wallet" type="button">Connect wallet</button>
+          <span className="simulation-status"><span className="status-dot" />{walletAddress ? "WALLET CONNECTED · READ ONLY" : "READ-ONLY QUOTES"}</span>
+          <button className="connect-wallet" type="button" onClick={connectWallet}>{walletAddress ? walletAddress.slice(0, 6) + "…" + walletAddress.slice(-4) : "Connect wallet"}</button>
         </div>
       </header>
 
@@ -98,13 +198,27 @@ function App() {
             <h1>Choose an execution provider</h1>
             <p className="heading-copy">Compare provider quotes across three fixed network routes.</p>
           </div>
-          <span className="demo-banner">DEMO QUOTES · NOT LIVE</span>
+          <span className="demo-banner">UNISWAP V3 ON-CHAIN · OTHER PROVIDERS DEMO</span>
         </section>
+        {walletError && <p className="wallet-error" role="alert">{walletError}</p>}
 
         <section className="borrow" aria-label="Route amount">
-          <div><div className="borrow-label">Route amount</div><div className="borrow-value">10,000.00 USDT</div></div>
+          <label className="borrow-input-label" htmlFor="route-amount">Route amount</label>
+          <div className="borrow-input-wrap">
+            <input
+              id="route-amount"
+              type="number"
+              min="0"
+              step="any"
+              inputMode="decimal"
+              value={capitalAmount}
+              onChange={(event) => { setCapitalAmount(event.target.value); setLiveQuote(null); setQuoteStatus("idle"); setQuoteError(""); }}
+              aria-describedby="amount-note"
+            />
+            <span>USDT</span>
+          </div>
           <span className="borrow-pill">Flash route closes in USDT</span>
-          <span className="borrow-hint">All quote numbers below are illustrative</span>
+          <span className="borrow-hint" id="amount-note">Demo providers scale proportionally; Uniswap reads the current on-chain quote.</span>
         </section>
 
         <section className="capital-panel" aria-label="Simulation capital source">
@@ -151,6 +265,19 @@ function App() {
               provider.name.toLowerCase().includes(search.toLowerCase()),
             );
             const pickerOpen = openRoute === route.id;
+            const isLiveUniswap = route.id === "ethereum" && selected.id === "uniswap";
+            const displayedOutput = isLiveUniswap
+              ? liveQuote ? formatUsdt(liveQuote.amountOut) : null
+              : formatScaledAmount(selected.output ?? "", capitalAmount);
+            const displayedDelta = displayedOutput
+              ? formatAmountDelta(displayedOutput, capitalAmount)
+              : "—";
+            const displayedFee = isLiveUniswap
+              ? selected.fee
+              : selected.fee + " · demo";
+            const displayedGas = isLiveUniswap && liveQuote
+              ? Number(liveQuote.gasEstimate).toLocaleString("en-US") + " units"
+              : selected.gas;
 
             return (
               <article className={pickerOpen ? "route-card route-card-active" : "route-card"} key={route.id}>
@@ -203,12 +330,12 @@ function App() {
                             <span className="provider-option-title">
                               <span className="provider-mark provider-mark-small">{provider.mark}</span>
                               {provider.name}
-                              {provider.best && <span className="best-badge">BEST NET</span>}
+                              {provider.id === "uniswap" && liveQuote ? <span className="best-badge">LIVE</span> : provider.best && <span className="best-badge">DEMO</span>}
                             </span>
                             <span className="provider-option-description">{provider.description}</span>
                           </span>
                           <span className="provider-option-quote">
-                            {provider.output}
+                            {provider.id === "uniswap" ? (liveQuote ? formatUsdt(liveQuote.amountOut) : "—") : formatScaledAmount(provider.output ?? "", capitalAmount)}
                             <span>USDT out</span>
                           </span>
                         </button>
@@ -219,16 +346,24 @@ function App() {
                 )}
 
                 <div className="route-result" aria-live="polite">
+                  {isLiveUniswap && (
+                    <p className={quoteStatus === "error" ? "quote-status quote-error" : "quote-status"} role="status">
+                      {quoteStatus === "loading" && "Fetching a read-only Uniswap quote…"}
+                      {quoteStatus === "ready" && liveQuote && "LIVE ON-CHAIN QUOTE · BLOCK " + liveQuote.blockNumber}
+                      {quoteStatus === "error" && quoteError}
+                      {quoteStatus === "idle" && (walletAddress ? "Waiting for quote…" : "Connect a wallet to fetch a live quote. No transaction will be sent.")}
+                    </p>
+                  )}
                   <div className="result-label">Estimated final amount</div>
-                  <div className="result-amount">{selected.output} <span>USDT</span></div>
+                  <div className="result-amount">{displayedOutput ?? (quoteStatus === "error" ? "Unavailable" : "Connect wallet")} {displayedOutput && <span>USDT</span>}</div>
                   <div className="result-metrics">
-                    <div><span>Net profit</span><strong className="profit-value">{selected.profit}</strong></div>
-                    <div><span>Swap fee</span><strong>{selected.fee} included</strong></div>
-                    <div><span>Gas estimate</span><strong>{selected.gas}</strong></div>
+                    <div><span>Gross delta</span><strong className="profit-value">{displayedDelta}</strong></div>
+                    <div><span>Swap fee</span><strong>{displayedFee}</strong></div>
+                    <div><span>Gas estimate</span><strong>{displayedGas}</strong></div>
                   </div>
                   <div className="route-footer">
                     <span>{route.tokens.map((token, tokenIndex) => <span key={route.id + "-path-" + tokenIndex}>{tokenIndex > 0 && <span className="path-divider"> → </span>}{token}</span>)}</span>
-                    <span className="demo-tag">DEMO</span>
+                    <span className="demo-tag">{isLiveUniswap && liveQuote ? "ON-CHAIN" : "DEMO"}</span>
                   </div>
                 </div>
               </article>
@@ -236,7 +371,7 @@ function App() {
           })}
         </section>
 
-        <p className="workspace-footnote">All amounts are interface examples, not live market quotes. Network routes are separate simulations.</p>
+        <p className="workspace-footnote">Gross delta is output minus input; it excludes loan fees and full transaction gas. Only the Ethereum Uniswap V3 quote is on-chain; other providers remain demo data.</p>
       </div>
     </main>
   );
