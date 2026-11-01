@@ -243,3 +243,10 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
   .borrow { flex-wrap: wrap; gap: 9px; }
   .borrow-hint { width: 100%; margin-left: 0; }
 }
+
+/* Keep the route grid inside the browser viewport on desktop and laptop screens. */
+.route-studio { box-sizing: border-box; width: calc(100% - 32px); max-width: 1440px; }
+.studio-content, .route-grid, .route-card { min-width: 0; }
+.route-grid { width: 100%; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 1050px) { .route-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 850px) { .route-grid { grid-template-columns: minmax(0, 1fr); } }

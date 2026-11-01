@@ -11,9 +11,6 @@ type ProviderQuote = {
   fee: string;
   gas: string;
   best?: boolean;
-  gross?: string;
-  loanFee?: string;
-  gasCost?: string;
 };
 
 type Route = {
@@ -33,9 +30,9 @@ const routes: Route[] = [
     family: "EVM",
     tokens: ["USDT", "WETH", "USDC", "USDT"],
     providers: [
-      { id: "uniswap", name: "Uniswap V3", mark: "UNI", description: "Concentrated liquidity · 0.30% pool", output: "10,042.18", profit: "+$27.91", fee: "0.30%", gas: "165k units", best: true, gross: "+$42.18", loanFee: "−$5.00", gasCost: "−$9.27" },
-      { id: "sushi", name: "SushiSwap", mark: "S", description: "Constant-product pool · demo quote", output: "10,033.64", profit: "+$19.80", fee: "0.30%", gas: "157k units", gross: "+$33.64", loanFee: "−$5.00", gasCost: "−$8.84" },
-      { id: "balancer", name: "Balancer", mark: "B", description: "Weighted pool · demo quote", output: "10,026.30", profit: "+$12.46", fee: "0.10%", gas: "157k units", gross: "+$26.30", loanFee: "−$5.00", gasCost: "−$8.84" },
+      { id: "uniswap", name: "Uniswap V3", mark: "UNI", description: "Concentrated liquidity · 0.30% pool", output: "10,042.18", profit: "+$27.91", fee: "0.30%", gas: "165k units", best: true },
+      { id: "sushi", name: "SushiSwap", mark: "S", description: "Constant-product pool · demo quote", output: "10,033.64", profit: "+$19.80", fee: "0.30%", gas: "157k units" },
+      { id: "balancer", name: "Balancer", mark: "B", description: "Weighted pool · demo quote", output: "10,026.30", profit: "+$12.46", fee: "0.10%", gas: "157k units" },
     ],
   },
   {
@@ -72,11 +69,6 @@ function App() {
     solana: "jupiter",
     other: "aerodrome",
   });
-
-  const ethereumRoute = routes[0];
-  const selectedEthereum =
-    ethereumRoute.providers.find((provider) => provider.id === selectedProviders.ethereum) ??
-    ethereumRoute.providers[0];
 
   function chooseProvider(routeId: string, providerId: string) {
     setSelectedProviders((current) => ({ ...current, [routeId]: providerId }));
@@ -234,14 +226,6 @@ function App() {
                     <div><span>Swap fee</span><strong>{selected.fee} included</strong></div>
                     <div><span>Gas estimate</span><strong>{selected.gas}</strong></div>
                   </div>
-                  {route.id === "ethereum" && (
-                    <div className="profit-breakdown">
-                      <div><span>Gross difference</span><strong>{selectedEthereum.gross}</strong></div>
-                      <div><span>Flash-loan fee · demo</span><strong>{selectedEthereum.loanFee}</strong></div>
-                      <div><span>Gas cost · demo</span><strong>{selectedEthereum.gasCost}</strong></div>
-                      <div className="breakdown-total"><span>Net estimate</span><strong>{selectedEthereum.profit}</strong></div>
-                    </div>
-                  )}
                   <div className="route-footer">
                     <span>{route.tokens.map((token, tokenIndex) => <span key={route.id + "-path-" + tokenIndex}>{tokenIndex > 0 && <span className="path-divider"> → </span>}{token}</span>)}</span>
                     <span className="demo-tag">DEMO</span>

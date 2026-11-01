@@ -19,3 +19,6 @@ button, input, select { font: inherit; }
 button { -webkit-tap-highlight-color: transparent; }
 #root { min-height: 100vh; }
 ::selection { color: #effffb; background: #276e60; }
+
+html, body { width: 100%; overflow-x: hidden; }
+#root { width: 100%; max-width: 100vw; min-width: 0; }
