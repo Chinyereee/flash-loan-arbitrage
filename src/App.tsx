@@ -507,16 +507,47 @@ function App() {
               : isLiveJupiter && liveSolanaQuote
                 ? "Not included in quote"
                 : selected.gas + " · demo";
-            const liveOutputForPicker = (providerId: string) => {
+            const liveOutputForPicker = (providerId: string): number | null => {
               if (isEthereumRoute) {
                 const quote = quoteForEthereumProvider(providerId);
-                return quote ? formatUsdt(quote.amountOut) : "—";
+                return quote ? Number(quote.amountOut) : null;
               }
-              return providerId === "uniswap" && liveQuote
-                ? formatUsdt(liveQuote.amountOut)
-                : providerId === "jupiter" && liveSolanaQuote
-                  ? formatUsdt(liveSolanaQuote.amountOut)
-                  : null;
+              return route.id === "solana" && providerId === "jupiter" && liveSolanaQuote
+                ? Number(liveSolanaQuote.amountOut)
+                : null;
+            };
+            const liveProviderIds = route.providers
+              .filter((provider) => liveOutputForPicker(provider.id) !== null)
+              .map((provider) => provider.id);
+            const bestLiveProviderId = liveProviderIds.reduce<string | null>((bestId, providerId) => {
+              if (!bestId) return providerId;
+              return (liveOutputForPicker(providerId) ?? 0) > (liveOutputForPicker(bestId) ?? 0) ? providerId : bestId;
+            }, null);
+            const selectedHasLiveQuote = liveOutputForPicker(selected.id) !== null;
+            const selectedProviderDescription = selectedHasLiveQuote
+              ? liveProviderIds.length < 2 ? "Only live quote available"
+                : selected.id === bestLiveProviderId ? "Best live output"
+                  : "Live quote · lower output"
+              : selectedQuoteStatus === "error" ? "Quote failed · retry below"
+                : isEthereumRoute ? selected.id === "balancer" ? "Waiting for live quote" : "Connect wallet for live quote"
+                  : isLiveJupiter ? "Waiting for live quote" : "Illustrative quote · not live";
+            const providerBadge = (provider: ProviderQuote) => {
+              if (liveOutputForPicker(provider.id) !== null) {
+                return liveProviderIds.length < 2 ? "ONLY LIVE" : provider.id === bestLiveProviderId ? "BEST LIVE" : "LIVE";
+              }
+              if (route.id === "ethereum") {
+                return statusForEthereumProvider(provider.id) === "loading" ? "QUOTING"
+                  : statusForEthereumProvider(provider.id) === "error" ? "UNAVAILABLE"
+                    : provider.id === "balancer" ? "LIVE QUOTE" : "CONNECT WALLET";
+              }
+              if (route.id === "solana" && provider.id === "jupiter") {
+                return solanaQuoteStatus === "loading" ? "QUOTING" : "LIVE QUOTE";
+              }
+              return provider.best ? "BEST DEMO" : "DEMO";
+            };
+            const liveOutputTextForPicker = (providerId: string) => {
+              const output = liveOutputForPicker(providerId);
+              return output === null ? null : formatUsdt(String(output));
             };
 
             return (
@@ -542,7 +573,7 @@ function App() {
                     <span className="provider-mark">{selected.mark}</span>
                     <span>
                       <span className="provider-name">{selected.name}</span>
-                      <span className="provider-description">Selected provider</span>
+                      <span className="provider-description">{selectedProviderDescription}</span>
                     </span>
                   </span>
                   <span className="provider-chevron" aria-hidden="true">{pickerOpen ? "⌃" : "⌄"}</span>
@@ -570,12 +601,12 @@ function App() {
                             <span className="provider-option-title">
                               <span className="provider-mark provider-mark-small">{provider.mark}</span>
                               {provider.name}
-                              {route.id === "ethereum" ? <span className="best-badge">{quoteForEthereumProvider(provider.id) ? "LIVE" : statusForEthereumProvider(provider.id) === "loading" ? "QUOTING" : statusForEthereumProvider(provider.id) === "error" ? "UNAVAILABLE" : provider.id === "balancer" ? "LIVE QUOTE" : "CONNECT WALLET"}</span> : provider.id === "jupiter" ? <span className="best-badge">{liveSolanaQuote ? "LIVE" : solanaQuoteStatus === "loading" ? "QUOTING" : "LIVE QUOTE"}</span> : provider.best && <span className="best-badge">DEMO</span>}
+                              <span className="best-badge">{providerBadge(provider)}</span>
                             </span>
                             <span className="provider-option-description">{provider.description}</span>
                           </span>
                           <span className="provider-option-quote">
-                            {liveOutputForPicker(provider.id) ?? formatScaledAmount(provider.output ?? "", capitalAmount)}
+                            {liveOutputTextForPicker(provider.id) ?? formatScaledAmount(provider.output ?? "", capitalAmount)}
                             <span>USDT out</span>
                           </span>
                         </button>
