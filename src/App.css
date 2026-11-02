@@ -372,3 +372,48 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .route-hop-amounts strong { overflow-wrap: anywhere; color: #bceede; font: 10px var(--mono); font-weight: 500; }
 .route-hop p { margin: 7px 0 0; color: #8592a4; font-size: 9px; }
 .route-details-note { margin: 9px 0 0; color: #8794a7; font-size: 9px; line-height: 1.5; }
+@media (max-width: 700px) {
+  .route-studio { width: calc(100% - 20px); min-height: calc(100vh - 20px); margin: 10px auto; border-radius: 14px; }
+  .studio-topbar { height: auto; min-height: 58px; gap: 8px; padding: 8px 12px; }
+  .studio-brand { gap: 7px; font-size: 12px; }
+  .topbar-actions { gap: 7px; }
+  .simulation-status { gap: 5px; padding: 4px 6px; font-size: 7px; letter-spacing: 0; }
+  .connect-wallet { padding: 8px 9px; font-size: 9px; }
+  .studio-content { padding: 16px 12px 20px; }
+  .studio-heading h1 { font-size: clamp(22px, 6vw, 27px); overflow-wrap: anywhere; }
+  .heading-copy { line-height: 1.5; }
+  .demo-banner { max-width: 100%; box-sizing: border-box; white-space: normal; line-height: 1.45; }
+  .borrow { align-items: flex-start; gap: 8px; padding: 11px; }
+  .borrow-pill, .borrow-hint { width: 100%; margin-left: 0; white-space: normal; line-height: 1.4; }
+  .route-grid { gap: 10px; }
+  .route-card { padding: 12px; }
+  .route-card-heading { margin-bottom: 11px; }
+  .provider-option { align-items: flex-start; gap: 6px; }
+  .provider-option-copy { min-width: 0; }
+  .provider-option-quote { max-width: 82px; overflow-wrap: anywhere; }
+  .result-amount { overflow-wrap: anywhere; }
+  .result-metrics strong { white-space: normal; overflow-wrap: anywhere; }
+  .quote-freshness { flex-wrap: wrap; }
+  .route-details-toggle { grid-template-columns: auto minmax(0, 1fr) auto; gap: 7px; }
+  .route-details-toggle > span:nth-child(2) { overflow-wrap: anywhere; }
+  .route-details { padding: 8px; }
+  .route-detail-meta { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .route-hop-heading { flex-wrap: wrap; }
+  .route-hop-heading > span:last-child { margin-left: auto; }
+  .route-hop-amounts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .route-warning { line-height: 1.55; }
+}
+@media (max-width: 430px) {
+  .route-studio { width: calc(100% - 12px); min-height: calc(100vh - 12px); margin: 6px auto; border-radius: 11px; }
+  .studio-topbar { padding: 8px 10px; }
+  .studio-brand { font-size: 11px; }
+  .simulation-status { display: flex; font-size: 0; }
+  .simulation-status .status-dot { width: 6px; height: 6px; }
+  .connect-wallet { max-width: 118px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .studio-content { padding: 14px 9px 18px; }
+  .route-card { padding: 11px; }
+  .result-metrics { gap: 4px; }
+  .result-metrics span { font-size: 8px; }
+  .result-metrics strong { font-size: 9px; }
+  .route-hop { padding: 8px; }
+}
