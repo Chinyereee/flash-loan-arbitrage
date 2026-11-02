@@ -591,6 +591,15 @@ function App() {
                     <div><span>Swap fee</span><strong>{displayedFee}</strong></div>
                     <div><span>Gas estimate</span><strong>{displayedGas}</strong></div>
                   </div>
+                  <div className="profit-breakdown" aria-label="Profit estimate breakdown">
+                    <div><span>Amount in</span><strong>{formatUsdt(capitalAmount)} USDT</strong></div>
+                    <div><span>Amount out</span><strong>{displayedOutput === "—" ? "Quote unavailable" : `${displayedOutput} USDT`}</strong></div>
+                    <div><span>Gross difference</span><strong className="profit-value">{displayedDelta}</strong></div>
+                    <div><span>{capitalMode === "flash" ? "Flash loan fee" : "Borrowing cost"}</span><strong>Not quoted</strong></div>
+                    <div><span>Gas cost</span><strong>Not priced</strong></div>
+                    <div className="breakdown-total"><span>Net estimate</span><strong>Unavailable</strong></div>
+                    <p className="breakdown-note">{selectedQuoteTimestamp ? "The live swap quote includes pool fees. Loan fees and gas in USD are not connected, so this is not a net profit estimate." : "This route uses illustrative or unavailable quote data. Loan fees and gas in USD are not connected, so net profit cannot be estimated."}</p>
+                  </div>
                   <div className="route-footer">
                     <span>{route.tokens.map((token, tokenIndex) => <span key={route.id + "-path-" + tokenIndex}>{tokenIndex > 0 && <span className="path-divider"> → </span>}{token}</span>)}</span>
                     <span className="demo-tag">{isEthereumRoute ? selectedEthereumQuote ? "LIVE QUOTE" : statusForEthereumProvider(selected.id) === "loading" ? "QUOTING" : "QUOTE UNAVAILABLE" : isLiveJupiter && liveSolanaQuote ? "LIVE QUOTE" : "DEMO"}</span>

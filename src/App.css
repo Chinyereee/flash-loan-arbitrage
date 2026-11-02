@@ -111,6 +111,7 @@
 .profit-breakdown { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; margin-top: 12px; padding: 11px 0; border-top: 1px solid #2a3837; border-bottom: 1px solid #2a3837; }
 .profit-breakdown .breakdown-total { grid-column: 1 / -1; flex-direction: row; justify-content: space-between; padding-top: 8px; border-top: 1px dashed #354542; }
 .profit-breakdown .breakdown-total strong { color: #79dfb2; }
+.profit-breakdown .breakdown-note { grid-column: 1 / -1; margin: 2px 0 0; color: #7f8d8d; font-size: 9px; line-height: 1.45; }
 .route-footer { justify-content: space-between; margin-top: 10px; color: #84928f; font-size: 9px; }
 .demo-tag { color: #d1b86f; font: 9px var(--mono); letter-spacing: .08em; }
 .workspace-footnote { margin: 14px 1px 0; color: #718087; font-size: 10px; }
@@ -231,6 +232,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .profit-breakdown span { font-size: 10px; }
 .profit-breakdown strong { font: 500 10px var(--sans); }
 .profit-breakdown .breakdown-total { grid-column: auto; margin-top: 8px; padding-top: 8px; }
+.profit-breakdown .breakdown-note { margin: 9px 0 0; font-size: 10px; }
 .route-footer { margin-top: 12px; gap: 8px; color: #92a0b1; font-size: 10px; }
 .path-divider { color: #687586; }
 .demo-tag { color: #9a72ff; font: 500 10px var(--sans); letter-spacing: 0; }
