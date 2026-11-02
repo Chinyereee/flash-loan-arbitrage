@@ -116,6 +116,7 @@ function App() {
   const [liveQuote, setLiveQuote] = useState<LiveEthereumQuote | null>(null);
   const [quoteStatus, setQuoteStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [quoteError, setQuoteError] = useState("");
+  const [quoteRetryCounts, setQuoteRetryCounts] = useState<Record<string, number>>({});
   const [liveSushiQuote, setLiveSushiQuote] = useState<LiveEthereumDexQuote | null>(null);
   const [sushiQuoteStatus, setSushiQuoteStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [sushiQuoteError, setSushiQuoteError] = useState("");
@@ -193,7 +194,7 @@ function App() {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [capitalAmount, readProvider]);
+  }, [capitalAmount, readProvider, quoteRetryCounts["ethereum:uniswap"]]);
 
   useEffect(() => {
     if (!readProvider) {
@@ -232,7 +233,7 @@ function App() {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [capitalAmount, readProvider]);
+  }, [capitalAmount, readProvider, quoteRetryCounts["ethereum:sushi"]]);
 
   useEffect(() => {
     if (!capitalAmount.trim() || !/^\d+(\.\d*)?$/.test(capitalAmount) || Number(capitalAmount) <= 0) {
@@ -265,7 +266,7 @@ function App() {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [capitalAmount]);
+  }, [capitalAmount, quoteRetryCounts["ethereum:balancer"]]);
 
   useEffect(() => {
     if (selectedProviders.solana !== "jupiter") {
@@ -304,7 +305,7 @@ function App() {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [capitalAmount, selectedProviders.solana]);
+  }, [capitalAmount, selectedProviders.solana, quoteRetryCounts["solana:jupiter"]]);
 
   useEffect(() => {
     if (!reviewOpen) return;
@@ -319,6 +320,11 @@ function App() {
     setSelectedProviders((current) => ({ ...current, [routeId]: providerId }));
     setOpenRoute(null);
     setSearch("");
+  }
+
+  function retryQuote(routeId: string, providerId: string) {
+    const key = `${routeId}:${providerId}`;
+    setQuoteRetryCounts((current) => ({ ...current, [key]: (current[key] ?? 0) + 1 }));
   }
 
   const pageNoticeError = Boolean(walletError || quoteStatus === "error" || sushiQuoteStatus === "error" || balancerQuoteStatus === "error" || solanaQuoteStatus === "error");
@@ -583,6 +589,11 @@ function App() {
                   <div className={quoteStatusClass} role={selectedQuoteStatus === "error" ? "alert" : "status"}>
                     <span className="quote-freshness-dot" aria-hidden="true" />
                     <span>{quoteStatusText}</span>
+                    {selectedQuoteStatus === "error" && (
+                      <button className="quote-retry" type="button" onClick={() => retryQuote(route.id, selected.id)}>
+                        Retry quote
+                      </button>
+                    )}
                   </div>
                   <div className="result-label">Estimated final amount</div>
                   <div className="result-amount">{displayedOutput} {displayedOutput !== "—" && <span>USDT</span>}</div>

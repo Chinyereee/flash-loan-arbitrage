@@ -338,6 +338,8 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .route-continue-button:disabled { opacity: .58; cursor: not-allowed; transform: none; }
 .route-continue-button:disabled:hover { border-color: #483b69; background: #171625; transform: none; }
 .quote-freshness { display: flex; align-items: center; gap: 7px; margin: 0 0 10px; color: #9aa6b7; font: 9px var(--mono); letter-spacing: .035em; }
+.quote-retry { margin-left: auto; padding: 4px 7px; border: 1px solid #554680; border-radius: 6px; color: #c9b8ff; background: #1b1829; font: 9px var(--sans); cursor: pointer; }
+.quote-retry:hover { border-color: #9a72ff; background: #252038; }
 .quote-freshness-dot { width: 6px; height: 6px; flex: 0 0 6px; border-radius: 50%; background: #8792a3; }
 .quote-freshness-live { color: #7fe0b1; }
 .quote-freshness-live .quote-freshness-dot { background: #51d99a; box-shadow: 0 0 8px #51d99a66; }
