@@ -335,3 +335,15 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 }
 .route-continue-button:disabled { opacity: .58; cursor: not-allowed; transform: none; }
 .route-continue-button:disabled:hover { border-color: #483b69; background: #171625; transform: none; }
+.quote-freshness { display: flex; align-items: center; gap: 7px; margin: 0 0 10px; color: #9aa6b7; font: 9px var(--mono); letter-spacing: .035em; }
+.quote-freshness-dot { width: 6px; height: 6px; flex: 0 0 6px; border-radius: 50%; background: #8792a3; }
+.quote-freshness-live { color: #7fe0b1; }
+.quote-freshness-live .quote-freshness-dot { background: #51d99a; box-shadow: 0 0 8px #51d99a66; }
+.quote-freshness-stale { color: #e0c576; }
+.quote-freshness-stale .quote-freshness-dot { background: #d9b755; }
+.quote-freshness-loading { color: #b9a1ff; }
+.quote-freshness-loading .quote-freshness-dot { background: #9a72ff; animation: quote-pulse 1.2s ease-in-out infinite; }
+.quote-freshness-error { color: #ff9b9b; line-height: 1.4; letter-spacing: 0; }
+.quote-freshness-error .quote-freshness-dot { background: #f06c78; }
+.quote-freshness-idle .quote-freshness-dot { background: #d0ab53; }
+@keyframes quote-pulse { 50% { opacity: .35; } }

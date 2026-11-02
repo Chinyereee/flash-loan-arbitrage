@@ -28,6 +28,7 @@ export type LiveEthereumQuote = {
   amountOut: string;
   gasEstimate: string;
   blockNumber: number;
+  quotedAt: number;
 };
 
 export async function quoteEthereumUniswapCycle(
@@ -53,5 +54,6 @@ export async function quoteEthereumUniswapCycle(
     amountOut: formatUnits(quote[0], 6),
     gasEstimate: quote[3].toString(),
     blockNumber,
+    quotedAt: Date.now(),
   };
 }

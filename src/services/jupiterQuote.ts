@@ -15,6 +15,7 @@ type JupiterOrder = {
 export type LiveSolanaQuote = {
   amountOut: string;
   routers: string[];
+  quotedAt: number;
 };
 
 // Jupiter's no-key bucket is limited to 0.5 requests per second.
@@ -79,5 +80,6 @@ export async function quoteSolanaCycle(amountUsdt: string, signal?: AbortSignal)
   return {
     amountOut: fromBaseUnits(third.outAmount!, TOKENS.USDT.decimals),
     routers: [first.router, second.router, third.router].filter((router): router is string => Boolean(router)),
+    quotedAt: Date.now(),
   };
 }

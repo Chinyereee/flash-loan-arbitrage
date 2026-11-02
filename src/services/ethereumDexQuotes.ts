@@ -18,6 +18,7 @@ type BalancerPathsResponse = {
 export type LiveEthereumDexQuote = {
   amountOut: string;
   blockNumber?: number;
+  quotedAt: number;
   gasEstimate?: string;
   feeDescription: string;
   gasDescription: string;
@@ -37,6 +38,7 @@ export async function quoteSushiCycle(amount: string, provider: BrowserProvider)
   return {
     amountOut: formatUnits(amounts[3], 6),
     blockNumber,
+    quotedAt: Date.now(),
     feeDescription: "0.30% per pool · on-chain",
     gasDescription: "Quote only · gas not estimated",
   };
@@ -82,6 +84,7 @@ export async function quoteBalancerCycle(amount: string, signal?: AbortSignal): 
 
   return {
     amountOut: third,
+    quotedAt: Date.now(),
     feeDescription: "Balancer pool fees · live route",
     gasDescription: "Quote only · gas not estimated",
   };

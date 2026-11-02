@@ -90,6 +90,14 @@ function formatUsdt(value: string): string {
   }).format(amount);
 }
 
+function formatQuoteAge(quotedAt: number, now: number): string {
+  const seconds = Math.max(0, Math.floor((now - quotedAt) / 1000));
+  if (seconds < 10) return "updated just now";
+  if (seconds < 60) return `updated ${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  return `updated ${minutes}m ago`;
+}
+
 function formatAmountDelta(output: string, input: string): string {
   const outputValue = Number(output.replace(/,/g, ""));
   const inputValue = Number(input);
@@ -99,6 +107,7 @@ function formatAmountDelta(output: string, input: string): string {
 }
 
 function App() {
+  const [now, setNow] = useState(() => Date.now());
   const [capitalMode, setCapitalMode] = useState<"flash" | "collateral">("flash");
   const [flashProvider, setFlashProvider] = useState("Aave V3");
   const [capitalAmount, setCapitalAmount] = useState("10000");
@@ -127,6 +136,11 @@ function App() {
     solana: "jupiter",
     other: "aerodrome",
   });
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 10_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   async function connectWallet() {
     setWalletError("");
@@ -443,6 +457,25 @@ function App() {
                   : providerId === "balancer" ? balancerQuoteStatus
                     : "idle";
             const selectedEthereumQuote = isEthereumRoute ? quoteForEthereumProvider(selected.id) : null;
+            const selectedQuoteTimestamp = selectedEthereumQuote?.quotedAt ?? (isLiveJupiter ? liveSolanaQuote?.quotedAt : undefined);
+            const selectedQuoteStatus = isEthereumRoute
+              ? statusForEthereumProvider(selected.id)
+              : isLiveJupiter ? solanaQuoteStatus : "idle";
+            const selectedQuoteError = isEthereumRoute
+              ? selected.id === "uniswap" ? quoteError
+                : selected.id === "sushi" ? sushiQuoteError
+                  : selected.id === "balancer" ? balancerQuoteError : ""
+              : isLiveJupiter ? solanaQuoteError : "";
+            const quoteStatusText = selectedQuoteTimestamp
+              ? `LIVE · ${formatQuoteAge(selectedQuoteTimestamp, now)}`
+              : selectedQuoteStatus === "loading" ? "FETCHING LIVE QUOTE"
+                : selectedQuoteStatus === "error" ? `QUOTE FAILED · ${selectedQuoteError}`
+                  : isEthereumRoute ? selected.id === "balancer" ? "WAITING FOR LIVE QUOTE" : "CONNECT WALLET FOR LIVE QUOTE"
+                    : isLiveJupiter ? "WAITING FOR LIVE QUOTE" : "DEMO QUOTE · NOT LIVE";
+            const quoteStatusClass = selectedQuoteTimestamp
+              ? now - selectedQuoteTimestamp > 90_000 ? "quote-freshness quote-freshness-stale" : "quote-freshness quote-freshness-live"
+              : selectedQuoteStatus === "error" ? "quote-freshness quote-freshness-error"
+                : selectedQuoteStatus === "loading" ? "quote-freshness quote-freshness-loading" : "quote-freshness quote-freshness-idle";
             const displayedOutput = isEthereumRoute
               ? selectedEthereumQuote ? formatUsdt(selectedEthereumQuote.amountOut) : "—"
               : isLiveJupiter && liveSolanaQuote
@@ -547,6 +580,10 @@ function App() {
                 )}
 
                 <div className="route-result" aria-live="polite">
+                  <div className={quoteStatusClass} role={selectedQuoteStatus === "error" ? "alert" : "status"}>
+                    <span className="quote-freshness-dot" aria-hidden="true" />
+                    <span>{quoteStatusText}</span>
+                  </div>
                   <div className="result-label">Estimated final amount</div>
                   <div className="result-amount">{displayedOutput} {displayedOutput !== "—" && <span>USDT</span>}</div>
                   <div className="result-metrics">
