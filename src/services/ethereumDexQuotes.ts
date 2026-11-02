@@ -1,4 +1,5 @@
 import { Contract, formatUnits, parseUnits, type BrowserProvider } from "ethers";
+import type { LiveHopQuote } from "./quoteTypes";
 
 const USDT = "0xdAC17F958D2ee523a2206206994597C13D831ec7";
 const WETH = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
@@ -19,6 +20,7 @@ export type LiveEthereumDexQuote = {
   amountOut: string;
   blockNumber?: number;
   quotedAt: number;
+  hops: LiveHopQuote[];
   gasEstimate?: string;
   feeDescription: string;
   gasDescription: string;
@@ -39,6 +41,11 @@ export async function quoteSushiCycle(amount: string, provider: BrowserProvider)
     amountOut: formatUnits(amounts[3], 6),
     blockNumber,
     quotedAt: Date.now(),
+    hops: [
+      { tokenIn: "USDT", tokenOut: "WETH", amountIn: formatUnits(amounts[0], 6), amountOut: formatUnits(amounts[1], 18), venue: "SushiSwap V2", feeDescription: "0.30% pool fee" },
+      { tokenIn: "WETH", tokenOut: "USDC", amountIn: formatUnits(amounts[1], 18), amountOut: formatUnits(amounts[2], 6), venue: "SushiSwap V2", feeDescription: "0.30% pool fee" },
+      { tokenIn: "USDC", tokenOut: "USDT", amountIn: formatUnits(amounts[2], 6), amountOut: formatUnits(amounts[3], 6), venue: "SushiSwap V2", feeDescription: "0.30% pool fee" },
+    ],
     feeDescription: "0.30% per pool · on-chain",
     gasDescription: "Quote only · gas not estimated",
   };
@@ -85,6 +92,11 @@ export async function quoteBalancerCycle(amount: string, signal?: AbortSignal): 
   return {
     amountOut: third,
     quotedAt: Date.now(),
+    hops: [
+      { tokenIn: "USDT", tokenOut: "WETH", amountIn: amount, amountOut: first, venue: "Balancer SOR", feeDescription: "Pool fee included in quote" },
+      { tokenIn: "WETH", tokenOut: "USDC", amountIn: first, amountOut: second, venue: "Balancer SOR", feeDescription: "Pool fee included in quote" },
+      { tokenIn: "USDC", tokenOut: "USDT", amountIn: second, amountOut: third, venue: "Balancer SOR", feeDescription: "Pool fee included in quote" },
+    ],
     feeDescription: "Balancer pool fees · live route",
     gasDescription: "Quote only · gas not estimated",
   };

@@ -5,6 +5,7 @@ import {
   parseUnits,
   solidityPacked,
 } from "ethers";
+import type { LiveHopQuote } from "./quoteTypes";
 
 export const ETHEREUM_MAINNET_CHAIN_ID = 1n;
 
@@ -29,6 +30,7 @@ export type LiveEthereumQuote = {
   gasEstimate: string;
   blockNumber: number;
   quotedAt: number;
+  hops: LiveHopQuote[];
 };
 
 export async function quoteEthereumUniswapCycle(
@@ -45,9 +47,32 @@ export async function quoteEthereumUniswapCycle(
     throw new Error("Switch your wallet to Ethereum Mainnet to request this quote.");
   }
 
-  const quoter = new Contract(QUOTER_V2_ADDRESS, QUOTER_ABI, provider);
-  const quote = await quoter.getFunction("quoteExactInput").staticCall(PATH, amountIn);
   const blockNumber = await provider.getBlockNumber();
+  const quoter = new Contract(QUOTER_V2_ADDRESS, QUOTER_ABI, provider);
+  const quote = await quoter.getFunction("quoteExactInput").staticCall(PATH, amountIn, { blockTag: blockNumber });
+  const hopConfig = [
+    { tokenIn: "USDT", tokenOut: "WETH", addressIn: USDT_ADDRESS, addressOut: WETH_ADDRESS, decimalsIn: 6, decimalsOut: 18, fee: 500, feeDescription: "0.05% pool fee" },
+    { tokenIn: "WETH", tokenOut: "USDC", addressIn: WETH_ADDRESS, addressOut: USDC_ADDRESS, decimalsIn: 18, decimalsOut: 6, fee: 500, feeDescription: "0.05% pool fee" },
+    { tokenIn: "USDC", tokenOut: "USDT", addressIn: USDC_ADDRESS, addressOut: USDT_ADDRESS, decimalsIn: 6, decimalsOut: 6, fee: 100, feeDescription: "0.01% pool fee" },
+  ];
+  let hopAmountIn = amountIn;
+  const hops: LiveHopQuote[] = [];
+  for (const hop of hopConfig) {
+    const hopPath = solidityPacked(
+      ["address", "uint24", "address"],
+      [hop.addressIn, hop.fee, hop.addressOut],
+    );
+    const hopQuote = await quoter.getFunction("quoteExactInput").staticCall(hopPath, hopAmountIn, { blockTag: blockNumber });
+    hops.push({
+      tokenIn: hop.tokenIn,
+      tokenOut: hop.tokenOut,
+      amountIn: formatUnits(hopAmountIn, hop.decimalsIn),
+      amountOut: formatUnits(hopQuote[0], hop.decimalsOut),
+      venue: "Uniswap V3",
+      feeDescription: hop.feeDescription,
+    });
+    hopAmountIn = hopQuote[0];
+  }
 
   return {
     amountIn: formatUnits(amountIn, 6),
@@ -55,5 +80,6 @@ export async function quoteEthereumUniswapCycle(
     gasEstimate: quote[3].toString(),
     blockNumber,
     quotedAt: Date.now(),
+    hops,
   };
 }

@@ -351,3 +351,24 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .quote-freshness-error .quote-freshness-dot { background: #f06c78; }
 .quote-freshness-idle .quote-freshness-dot { background: #d0ab53; }
 @keyframes quote-pulse { 50% { opacity: .35; } }
+.route-details-toggle { width: 100%; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; margin-top: 9px; padding: 9px 10px; border: 1px solid #273240; border-radius: 8px; color: #d7deea; background: #151d27; text-align: left; cursor: pointer; }
+.route-details-toggle:hover, .route-details-toggle[aria-expanded="true"] { border-color: #51417b; background: #191d2a; }
+.route-details-toggle > span:first-child { font-size: 10px; font-weight: 550; }
+.route-details-toggle > span:nth-child(2) { color: #8794a7; font: 9px var(--mono); text-align: right; }
+.route-details-toggle > span:last-child { color: #b69cff; font-size: 14px; }
+.route-details { margin-top: 8px; padding: 10px; border: 1px solid #273240; border-radius: 9px; background: #111821; }
+.route-detail-meta { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding-bottom: 10px; border-bottom: 1px solid #273240; }
+.route-detail-meta div, .route-hop-amounts div { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
+.route-detail-meta span, .route-hop-amounts span { color: #8390a3; font-size: 9px; }
+.route-detail-meta strong { overflow-wrap: anywhere; color: #dce3ee; font-size: 10px; font-weight: 500; }
+.route-hop-list { display: grid; gap: 7px; margin: 9px 0 0; padding: 0; list-style: none; }
+.route-hop { padding: 9px; border: 1px solid #273240; border-radius: 8px; background: #171f2a; }
+.route-hop-heading { display: flex; align-items: center; gap: 8px; }
+.route-hop-heading > span:first-child { color: #aa93ea; font: 8px var(--mono); }
+.route-hop-heading strong { flex: 1; color: #e5eaf3; font-size: 10px; font-weight: 550; }
+.route-hop-heading strong span { color: #8290a2; }
+.route-hop-heading > span:last-child { color: #8997a9; font-size: 9px; }
+.route-hop-amounts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.route-hop-amounts strong { overflow-wrap: anywhere; color: #bceede; font: 10px var(--mono); font-weight: 500; }
+.route-hop p { margin: 7px 0 0; color: #8592a4; font-size: 9px; }
+.route-details-note { margin: 9px 0 0; color: #8794a7; font-size: 9px; line-height: 1.5; }

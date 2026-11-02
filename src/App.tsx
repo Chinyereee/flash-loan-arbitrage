@@ -90,6 +90,15 @@ function formatUsdt(value: string): string {
   }).format(amount);
 }
 
+function formatTokenAmount(value: string): string {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return "—";
+  return new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 8,
+  }).format(amount);
+}
+
 function formatQuoteAge(quotedAt: number, now: number): string {
   const seconds = Math.max(0, Math.floor((now - quotedAt) / 1000));
   if (seconds < 10) return "updated just now";
@@ -131,6 +140,7 @@ function App() {
   const [reviewRouteId, setReviewRouteId] = useState("ethereum");
   const [signatureSimulated, setSignatureSimulated] = useState(false);
   const [openRoute, setOpenRoute] = useState<string | null>("ethereum");
+  const [openDetails, setOpenDetails] = useState<Record<string, boolean>>({});
   const [search, setSearch] = useState("");
   const [selectedProviders, setSelectedProviders] = useState<Record<string, string>>({
     ethereum: "uniswap",
@@ -463,6 +473,17 @@ function App() {
                   : providerId === "balancer" ? balancerQuoteStatus
                     : "idle";
             const selectedEthereumQuote = isEthereumRoute ? quoteForEthereumProvider(selected.id) : null;
+            const selectedQuoteHops = selectedEthereumQuote?.hops ?? (isLiveJupiter ? liveSolanaQuote?.hops : undefined);
+            const selectedFeeAssumption = selectedEthereumQuote && "feeDescription" in selectedEthereumQuote
+              ? selectedEthereumQuote.feeDescription
+              : isEthereumRoute && selected.id === "uniswap" ? `${selected.fee} configured pool tiers`
+                : isLiveJupiter && liveSolanaQuote ? "Route fees reflected in live quote"
+                  : `${selected.fee} · demo assumption`;
+            const selectedGasDetails = isEthereumRoute && selectedEthereumQuote
+              ? selectedEthereumQuote.gasEstimate ? `${Number(selectedEthereumQuote.gasEstimate).toLocaleString("en-US")} units · gas price not included`
+                : "gasDescription" in selectedEthereumQuote ? selectedEthereumQuote.gasDescription : "Gas not estimated"
+              : isLiveJupiter && liveSolanaQuote ? "Not priced by Jupiter quote"
+                : `${selected.gas} · demo assumption`;
             const selectedQuoteTimestamp = selectedEthereumQuote?.quotedAt ?? (isLiveJupiter ? liveSolanaQuote?.quotedAt : undefined);
             const selectedQuoteStatus = isEthereumRoute
               ? statusForEthereumProvider(selected.id)
@@ -646,6 +667,47 @@ function App() {
                     <span>{route.tokens.map((token, tokenIndex) => <span key={route.id + "-path-" + tokenIndex}>{tokenIndex > 0 && <span className="path-divider"> → </span>}{token}</span>)}</span>
                     <span className="demo-tag">{isEthereumRoute ? selectedEthereumQuote ? "LIVE QUOTE" : statusForEthereumProvider(selected.id) === "loading" ? "QUOTING" : "QUOTE UNAVAILABLE" : isLiveJupiter && liveSolanaQuote ? "LIVE QUOTE" : "DEMO"}</span>
                   </div>
+                  <button
+                    className="route-details-toggle"
+                    type="button"
+                    aria-expanded={Boolean(openDetails[route.id])}
+                    aria-controls={route.id + "-route-details"}
+                    onClick={() => setOpenDetails((current) => ({ ...current, [route.id]: !current[route.id] }))}
+                  >
+                    <span>Route details</span>
+                    <span>{selectedQuoteHops ? `${selectedQuoteHops.length} hops · quoted amounts` : "Hop amounts unavailable"}</span>
+                    <span aria-hidden="true">{openDetails[route.id] ? "−" : "+"}</span>
+                  </button>
+                  {openDetails[route.id] && (
+                    <div className="route-details" id={route.id + "-route-details"}>
+                      <div className="route-detail-meta">
+                        <div><span>Provider</span><strong>{selected.name}</strong></div>
+                        <div><span>Fee assumption</span><strong>{selectedFeeAssumption}</strong></div>
+                        <div><span>Gas</span><strong>{selectedGasDetails}</strong></div>
+                      </div>
+                      <ol className="route-hop-list">
+                        {route.tokens.slice(0, -1).map((token, hopIndex) => {
+                          const tokenOut = route.tokens[hopIndex + 1];
+                          const hop = selectedQuoteHops?.[hopIndex];
+                          return (
+                            <li className="route-hop" key={`${route.id}-hop-${hopIndex}`}>
+                              <div className="route-hop-heading">
+                                <span>HOP 0{hopIndex + 1}</span>
+                                <strong>{token} <span>→</span> {tokenOut}</strong>
+                                <span>{hop?.venue ?? selected.name}</span>
+                              </div>
+                              <div className="route-hop-amounts">
+                                <div><span>IN</span><strong>{hop ? formatTokenAmount(hop.amountIn) : "Unavailable"} {token}</strong></div>
+                                <div><span>OUT</span><strong>{hop ? formatTokenAmount(hop.amountOut) : "Unavailable"} {tokenOut}</strong></div>
+                              </div>
+                              <p>{hop?.feeDescription ?? (selected.output ? `${selected.fee} · demo assumption` : "Per-hop fee details unavailable")}</p>
+                            </li>
+                          );
+                        })}
+                      </ol>
+                      <p className="route-details-note">{selectedQuoteHops ? "Per-hop amounts are read-only quote results, not an execution guarantee. Pool state, gas, and prices may change before a transaction." : "Per-hop amounts appear after this provider returns a quote. Demo provider amounts are illustrative."}</p>
+                    </div>
+                  )}
                   <button
                     className="route-continue-button"
                     type="button"

@@ -1,3 +1,5 @@
+import type { LiveHopQuote } from "./quoteTypes";
+
 const JUPITER_ORDER_URL = "https://api.jup.ag/swap/v2/order";
 
 const TOKENS = {
@@ -16,6 +18,7 @@ export type LiveSolanaQuote = {
   amountOut: string;
   routers: string[];
   quotedAt: number;
+  hops: LiveHopQuote[];
 };
 
 // Jupiter's no-key bucket is limited to 0.5 requests per second.
@@ -31,7 +34,6 @@ function toBaseUnits(amount: string, decimals: number): string {
   const normalizedFraction = fraction.padEnd(decimals, "0").slice(0, decimals);
   return (BigInt(normalizedWhole) * 10n ** BigInt(decimals) + BigInt(normalizedFraction || "0")).toString();
 }
-
 function fromBaseUnits(amount: string, decimals: number): string {
   const divisor = 10n ** BigInt(decimals);
   const raw = BigInt(amount);
@@ -81,5 +83,10 @@ export async function quoteSolanaCycle(amountUsdt: string, signal?: AbortSignal)
     amountOut: fromBaseUnits(third.outAmount!, TOKENS.USDT.decimals),
     routers: [first.router, second.router, third.router].filter((router): router is string => Boolean(router)),
     quotedAt: Date.now(),
+    hops: [
+      { tokenIn: "USDT", tokenOut: "SOL", amountIn: amountUsdt, amountOut: fromBaseUnits(first.outAmount!, TOKENS.SOL.decimals), venue: first.router || "Jupiter", feeDescription: "Route fees reflected in quote" },
+      { tokenIn: "SOL", tokenOut: "USDC", amountIn: fromBaseUnits(first.outAmount!, TOKENS.SOL.decimals), amountOut: fromBaseUnits(second.outAmount!, TOKENS.USDC.decimals), venue: second.router || "Jupiter", feeDescription: "Route fees reflected in quote" },
+      { tokenIn: "USDC", tokenOut: "USDT", amountIn: fromBaseUnits(second.outAmount!, TOKENS.USDC.decimals), amountOut: fromBaseUnits(third.outAmount!, TOKENS.USDT.decimals), venue: third.router || "Jupiter", feeDescription: "Route fees reflected in quote" },
+    ],
   };
 }
